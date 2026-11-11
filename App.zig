@@ -1,111 +1,84 @@
-//! foot's fonts and color themes. `generate` writes the set ones to `file`, which foot.ini
-//! includes (`include=~/.config/foot/kosm.ini`); null options are left to foot.ini and foot's
-//! defaults. Field names are foot's option names in Zig casing (`font_bold` for `font-bold`).
+//! foot's settings: every section and option of foot.ini, named like foot's own in Zig casing
+//! (`font_bold` for `font-bold`, `key_bindings` for `[key-bindings]`). `generate` writes the
+//! set ones to `file`, which foot.ini includes (`include=~/.config/foot/kosm.ini`); null options
+//! are left to foot.ini and foot's defaults.
 
 const App = @This();
 
 const std = @import("std");
 const kosm = @import("kosm");
+const settings = @import("settings.zig");
+
+/// The values options take beyond numbers, text and colors.
+pub const values = @import("values.zig");
+pub const Main = @import("sections/Main.zig");
+pub const Security = @import("sections/Security.zig");
+pub const Bell = @import("sections/Bell.zig");
+pub const DesktopNotifications = @import("sections/DesktopNotifications.zig");
+pub const Scrollback = @import("sections/Scrollback.zig");
+pub const Url = @import("sections/Url.zig");
+pub const Cursor = @import("sections/Cursor.zig");
+pub const Mouse = @import("sections/Mouse.zig");
+pub const Touch = @import("sections/Touch.zig");
+pub const Colors = @import("sections/Colors.zig");
+pub const Csd = @import("sections/Csd.zig");
+pub const KeyBindings = @import("sections/KeyBindings.zig");
+pub const SearchBindings = @import("sections/SearchBindings.zig");
+pub const UrlBindings = @import("sections/UrlBindings.zig");
+pub const MouseBindings = @import("sections/MouseBindings.zig");
 
 /// The file kosm owns; foot.ini includes it. Default: `~/.config/foot/kosm.ini`.
 file: []const u8 = "~/.config/foot/kosm.ini",
 /// How values are spelled. Null fields take the foot adapter's: `RRGGBB` lowercase, `yes`/`no`.
+/// foot reads colors only without a `#`.
 format: kosm.Format = .{},
-/// foot's `[main]` options.
+/// `[main]`: the shell, fonts, padding and window.
 main: Main = .{},
-/// `[colors-dark]`: the theme foot starts with, unless foot.ini sets `initial-color-theme=light`.
+/// `[environment]`: variables set for the program foot runs. Default: none.
+environment: []const values.EnvironmentVariable = &.{},
+/// `[security]`.
+security: Security = .{},
+/// `[bell]`: what a BEL does.
+bell: Bell = .{},
+/// `[desktop-notifications]`.
+desktop_notifications: DesktopNotifications = .{},
+/// `[scrollback]`.
+scrollback: Scrollback = .{},
+/// `[url]`: URL mode.
+url: Url = .{},
+/// `[regex:name]` sections, for `regex_launch` and `regex_copy` bindings. Default: none.
+regex: []const values.Regex = &.{},
+/// `[cursor]`.
+cursor: Cursor = .{},
+/// `[mouse]`.
+mouse: Mouse = .{},
+/// `[touch]`.
+touch: Touch = .{},
+/// `[colors-dark]`: the theme foot starts with, unless `main.initial_color_theme` is light.
 colors_dark: Colors = .{},
-/// `[colors-light]`: the theme foot switches to on SIGUSR2 or its theme-switch bindings.
+/// `[colors-light]`: the other theme, switched to by SIGUSR2 or the color theme bindings.
 colors_light: Colors = .{},
+/// `[csd]`: the decorations foot draws itself.
+csd: Csd = .{},
+/// `[key-bindings]`.
+key_bindings: KeyBindings = .{},
+/// `[search-bindings]`: keys in scrollback search.
+search_bindings: SearchBindings = .{},
+/// `[url-bindings]`: keys in URL mode.
+url_bindings: UrlBindings = .{},
+/// `[text-bindings]`: keys sending text to the program. Default: none.
+text_bindings: []const values.TextBinding = &.{},
+/// `[mouse-bindings]`.
+mouse_bindings: MouseBindings = .{},
 /// Options the app doesn't cover, by `section.option` with foot's own names:
-/// `.{ .path = "main.pad", .value = .{ .raw = "10x10" } }`. One that repeats a set option or
-/// another extra fails the apply. Default: none.
+/// `.{ .path = "main.future-option", .value = .{ .raw = "yes" } }`. One that repeats a set option
+/// or another extra fails the apply. Default: none.
 extra: []const kosm.Setting = &.{},
-
-/// foot's `[main]` fonts. Each is a list in fallback order: `&.{ .{ .family = "Iosevka",
-/// .size = 13 }, .{ .family = "Noto Color Emoji" } }`. null: foot's own.
-pub const Main = struct {
-    /// `font`: the regular font and its fallbacks. null: foot's default, `monospace:size=8`.
-    font: ?[]const Font = null,
-    /// `font-bold`. null: the regular font in bold.
-    font_bold: ?[]const Font = null,
-    /// `font-italic`. null: the regular font in italic.
-    font_italic: ?[]const Font = null,
-    /// `font-bold-italic`. null: the regular font in bold italic.
-    font_bold_italic: ?[]const Font = null,
-};
-
-/// One font of a list, written `Family:size=13`.
-pub const Font = struct {
-    /// The fontconfig family name. It may not hold `,` or `:`, which separate fonts and options.
-    family: []const u8,
-    /// The size in points. null: foot's.
-    size: ?f64 = null,
-};
-
-/// A `[colors-dark]` or `[colors-light]` theme. Colors are opaque; the background's
-/// translucency is `alpha`.
-pub const Colors = struct {
-    /// Background translucency, 0 (transparent) to 1 (opaque). null: foot's default, 1.
-    alpha: ?f64 = null,
-    /// Text in the default color. null: foot's default, `839496`.
-    foreground: ?kosm.Color = null,
-    /// The default background. null: foot's default, `002b36`.
-    background: ?kosm.Color = null,
-    /// The cursor and the text under it. null: foreground and background reversed.
-    cursor: ?Cursor = null,
-    /// Selected text. null: the cell's background color.
-    selection_foreground: ?kosm.Color = null,
-    /// The selection's background. null: the cell's foreground color.
-    selection_background: ?kosm.Color = null,
-    /// URL underlines and jump labels in URL mode. null: foot's default.
-    urls: ?kosm.Color = null,
-    /// ANSI black. null: foot's default.
-    regular0: ?kosm.Color = null,
-    /// ANSI red. null: foot's default.
-    regular1: ?kosm.Color = null,
-    /// ANSI green. null: foot's default.
-    regular2: ?kosm.Color = null,
-    /// ANSI yellow. null: foot's default.
-    regular3: ?kosm.Color = null,
-    /// ANSI blue. null: foot's default.
-    regular4: ?kosm.Color = null,
-    /// ANSI magenta. null: foot's default.
-    regular5: ?kosm.Color = null,
-    /// ANSI cyan. null: foot's default.
-    regular6: ?kosm.Color = null,
-    /// ANSI white. null: foot's default.
-    regular7: ?kosm.Color = null,
-    /// Bright black. null: foot's default.
-    bright0: ?kosm.Color = null,
-    /// Bright red. null: foot's default.
-    bright1: ?kosm.Color = null,
-    /// Bright green. null: foot's default.
-    bright2: ?kosm.Color = null,
-    /// Bright yellow. null: foot's default.
-    bright3: ?kosm.Color = null,
-    /// Bright blue. null: foot's default.
-    bright4: ?kosm.Color = null,
-    /// Bright magenta. null: foot's default.
-    bright5: ?kosm.Color = null,
-    /// Bright cyan. null: foot's default.
-    bright6: ?kosm.Color = null,
-    /// Bright white. null: foot's default.
-    bright7: ?kosm.Color = null,
-};
-
-/// The cursor's two colors, written `text cursor`.
-pub const Cursor = struct {
-    /// The character under the cursor.
-    text: kosm.Color,
-    /// The cursor block itself.
-    cursor: kosm.Color,
-};
 
 /// Colors from the theme into `colors_dark`, foot's starting theme, whatever the mode:
 /// foreground and background from white and black (swapped in light mode), the background's
 /// translucency from the theme's `background_alpha`, regular colors from the wheel and bright
-/// ones from the theme's `lightness.bright`. Fonts are left alone.
+/// ones from the theme's `lightness.bright`. Everything else is left to foot.
 pub fn from(theme: kosm.Theme) App {
     const palette = theme.palette;
     const variations = theme.variations;
@@ -116,7 +89,7 @@ pub fn from(theme: kosm.Theme) App {
         .alpha = theme.background_alpha,
         .foreground = foreground,
         .background = background,
-        .cursor = .{ .text = background, .cursor = foreground },
+        .cursor = .{ .text = background, .background = foreground },
         .selection_foreground = variations.emphasis.strong.apply(foreground),
         .selection_background = variations.state.selected.apply(background),
         .urls = palette.cyan,
@@ -128,60 +101,42 @@ pub fn from(theme: kosm.Theme) App {
     return .{ .colors_dark = colors };
 }
 
+/// The sections in the order foot.ini(5) lists them.
+const section_order = [_][]const u8{
+    "main",           "environment", "security",     "bell",            "desktop_notifications", "scrollback",
+    "url",            "regex",       "cursor",       "mouse",           "touch",                 "colors_dark",
+    "colors_light",   "csd",         "key_bindings", "search_bindings", "url_bindings",          "text_bindings",
+    "mouse_bindings",
+};
+
 /// Writes every set option to `file`, then the extras. foot reads its config only at start,
-/// so running terminals keep their colors until restarted.
+/// so running terminals keep their settings until restarted.
 pub fn apply(self: App, output: *kosm.Output) !void {
+    if (self.main.initial_window_size_pixels != null and self.main.initial_window_size_chars != null)
+        return output.fail(self.file, "'main.initial-window-size-pixels' and 'main.initial-window-size-chars' are both set; foot takes one", .{});
     var sections: std.ArrayList(kosm.Value.Entry) = .empty;
-    inline for (.{ "main", "colors_dark", "colors_light" }) |name| {
-        const entries = try section(output, self.file, @field(self, name));
-        if (entries.len != 0) try sections.append(output.allocator, .{ .key = comptime optionName(name), .value = .{ .table = entries } });
+    inline for (section_order) |name| {
+        const context: settings.Context = .{
+            .output = output,
+            .file = self.file,
+            .section = comptime settings.optionName(name),
+            .alpha_first = comptime std.mem.eql(u8, name, "csd"),
+        };
+        if (comptime std.mem.eql(u8, name, "regex")) {
+            try sections.appendSlice(output.allocator, try settings.regexSections(context, self.regex));
+        } else {
+            const entries = if (comptime std.mem.eql(u8, name, "environment"))
+                try settings.environment(context, self.environment)
+            else if (comptime std.mem.eql(u8, name, "text_bindings"))
+                try settings.textBindings(context, self.text_bindings)
+            else
+                try settings.section(context, @field(self, name));
+            if (entries.len != 0) try sections.append(output.allocator, .{ .key = context.section, .value = .{ .table = entries } });
+        }
     }
     const own = try kosm.Setting.leaves(output.allocator, .{ .table = sections.items });
     const all = try kosm.Setting.withExtras(output, self.file, own, self.extra, .{});
     try output.generate(.{ .file = self.file, .lang = "foot", .format = self.format }, try kosm.Setting.tree(output.allocator, all));
-}
-
-/// The set options of one section, under foot's names.
-fn section(output: *kosm.Output, file: []const u8, options: anytype) ![]const kosm.Value.Entry {
-    var entries: std.ArrayList(kosm.Value.Entry) = .empty;
-    const fields = @typeInfo(@TypeOf(options)).@"struct";
-    inline for (fields.field_names) |name| {
-        if (@field(options, name)) |option| {
-            const value: kosm.Value = switch (@TypeOf(option)) {
-                kosm.Color => .{ .color = option },
-                f64 => .{ .float = option },
-                Cursor => .{ .joined = try output.allocator.dupe(kosm.Value, &.{ .{ .color = option.text }, .{ .raw = " " }, .{ .color = option.cursor } }) },
-                []const Font => .{ .string = try fontList(output, file, comptime optionName(name), option) },
-                else => comptime unreachable,
-            };
-            try entries.append(output.allocator, .{ .key = comptime optionName(name), .value = value });
-        }
-    }
-    return entries.items;
-}
-
-/// `Family:size=13, Fallback:size=13`, failing on an empty list or a family foot would split.
-fn fontList(output: *kosm.Output, file: []const u8, option: []const u8, fonts: []const Font) ![]const u8 {
-    if (fonts.len == 0) return output.fail(file, "'{s}' lists no fonts; leave it null to keep foot's own", .{option});
-    var text: std.Io.Writer.Allocating = .init(output.allocator);
-    for (fonts, 0..) |font, index| {
-        if (font.family.len == 0 or std.mem.indexOfAny(u8, font.family, ",:") != null)
-            return output.fail(file, "'{s}': font family '{s}' is empty or holds ',' or ':', which foot reads as separators", .{ option, font.family });
-        if (index != 0) try text.writer.writeAll(", ");
-        try text.writer.writeAll(font.family);
-        if (font.size) |size| try text.writer.print(":size={d}", .{size});
-    }
-    return text.written();
-}
-
-/// foot's name for a field: `_` becomes `-`.
-fn optionName(comptime name: []const u8) []const u8 {
-    comptime {
-        var text: [name.len]u8 = undefined;
-        for (name, &text) |byte, *slot| slot.* = if (byte == '_') '-' else byte;
-        const final = text;
-        return &final;
-    }
 }
 
 const testing = std.testing;
@@ -223,6 +178,11 @@ const Fixture = struct {
         }
         return "(not planned)";
     }
+
+    fn expectFailure(fixture: *Fixture, app: App, message: []const u8) !void {
+        try testing.expectError(error.AppFailed, app.apply(&fixture.output));
+        try testing.expectEqualStrings(message, fixture.diagnostics.message());
+    }
 };
 
 test "fonts in fallback order and the theme's colors in foot's spelling, extras last" {
@@ -233,14 +193,14 @@ test "fonts in fallback order and the theme's colors in foot's spelling, extras 
     theme.background_alpha = 0.8;
     var app = from(theme);
     app.main.font = &.{ .{ .family = "Maple Mono Normal NFP", .size = 13 }, .{ .family = "Noto Color Emoji" } };
-    app.extra = &.{.{ .path = "main.pad", .value = .{ .raw = "10x10" } }};
+    app.extra = &.{.{ .path = "main.future-option", .value = .{ .raw = "yes" } }};
     try app.apply(&fixture.output);
 
     const written = fixture.planned();
     try testing.expect(std.mem.startsWith(u8, written,
         \\[main]
         \\font=Maple Mono Normal NFP:size=13, Noto Color Emoji
-        \\pad=10x10
+        \\future-option=yes
         \\
         \\[colors-dark]
         \\alpha=0.8
@@ -255,6 +215,102 @@ test "fonts in fallback order and the theme's colors in foot's spelling, extras 
     try testing.expect(std.mem.indexOf(u8, written, "colors-light") == null);
 }
 
+test "every kind of option in foot's spelling, sections in foot's order" {
+    var fixture: Fixture = undefined;
+    try fixture.init();
+    defer fixture.deinit();
+    const app: App = .{
+        .main = .{
+            .include = &.{ "~/a.ini", "~/b.ini" },
+            .font_size_adjustment = .{ .percent = 7.5 },
+            .line_height = .{ .pixels = 17 },
+            .letter_spacing = .{ .points = -0.5 },
+            .pad = .{ .left = 1, .top = 2, .right = 3, .bottom = 4, .center = .center_when_fullscreen },
+            .initial_window_size_chars = .{ .width = 80, .height = 24 },
+            .bold_text_in_bright = .palette_based,
+            .workers = 0,
+        },
+        .environment = &.{ .{ .name = "EDITOR", .value = "nvim" }, .{ .name = "EMPTY", .value = "" } },
+        .desktop_notifications = .{ .close = "" },
+        .security = .{ .osc52 = .copy_enabled },
+        .regex = &.{.{ .name = "hashes", .regex = "([a-f0-9]{7,40})", .launch = "git show ${match}" }},
+        .cursor = .{ .style = .beam, .beam_thickness = .{ .pixels = 2 } },
+        .colors_light = .{ .jump_labels = .{ .text = kosm.hex("000000"), .background = kosm.hex("ffff00") }, .palette = &.{.{ .index = 16, .color = kosm.hex("101010") }} },
+        .csd = .{ .preferred = .client, .color = kosm.hex("#ff000080") },
+        .key_bindings = .{
+            .search_start = &.{},
+            .clipboard_copy = &.{ "Control+Shift+c", "XF86Copy" },
+            .pipe_visible = &.{ .{ .command = "sh -c \"xurls | fuzzel\"", .keys = &.{"Control+Print"} }, .{ .command = "wl-copy" } },
+            .regex_copy = &.{.{ .regex = "hashes", .keys = &.{"Control+Mod1+Shift+q"} }},
+        },
+        .text_bindings = &.{.{ .text = "\\x1b[A", .keys = &.{"Mod4+k"} }},
+        .mouse_bindings = .{ .selection_override_modifiers = "Shift", .select_word = &.{"BTN_LEFT-2"} },
+    };
+    try app.apply(&fixture.output);
+    try testing.expectEqualStrings(
+        \\[main]
+        \\include=~/a.ini
+        \\include=~/b.ini
+        \\font-size-adjustment=7.5%
+        \\line-height=17px
+        \\letter-spacing=-0.5
+        \\pad=1x2x3x4 center-when-fullscreen
+        \\initial-window-size-chars=80x24
+        \\bold-text-in-bright=palette-based
+        \\workers=0
+        \\
+        \\[environment]
+        \\EDITOR=nvim
+        \\EMPTY=""
+        \\
+        \\[security]
+        \\osc52=copy-enabled
+        \\
+        \\[desktop-notifications]
+        \\close=""
+        \\
+        \\[regex:hashes]
+        \\regex=([a-f0-9]{7,40})
+        \\launch=git show ${match}
+        \\
+        \\[cursor]
+        \\style=beam
+        \\beam-thickness=2px
+        \\
+        \\[colors-light]
+        \\16=101010
+        \\jump-labels=000000 ffff00
+        \\
+        \\[csd]
+        \\preferred=client
+        \\color=80ff0000
+        \\
+        \\[key-bindings]
+        \\clipboard-copy=Control+Shift+c XF86Copy
+        \\search-start=none
+        \\pipe-visible=[sh -c "xurls | fuzzel"] Control+Print
+        \\pipe-visible=[wl-copy] none
+        \\regex-copy=[hashes] Control+Mod1+Shift+q
+        \\
+        \\[text-bindings]
+        \\\x1b[A=Mod4+k
+        \\
+        \\[mouse-bindings]
+        \\selection-override-modifiers=Shift
+        \\select-word=BTN_LEFT-2
+        \\
+    , fixture.planned());
+}
+
+test "pad pairs its sides when it can and leaves centering off unless set" {
+    var fixture: Fixture = undefined;
+    try fixture.init();
+    defer fixture.deinit();
+    const app: App = .{ .main = .{ .pad = .all(10) } };
+    try app.apply(&fixture.output);
+    try testing.expectEqualStrings("[main]\npad=10x10\n", fixture.planned());
+}
+
 test "App{} writes an empty file, and bad fonts or a clashing extra fail naming them" {
     var fixture: Fixture = undefined;
     try fixture.init();
@@ -263,13 +319,38 @@ test "App{} writes an empty file, and bad fonts or a clashing extra fail naming 
     try empty.apply(&fixture.output);
     try testing.expectEqualStrings("", fixture.planned());
 
-    const comma: App = .{ .main = .{ .font_bold = &.{.{ .family = "A, B" }} } };
-    try testing.expectError(error.AppFailed, comma.apply(&fixture.output));
-    try testing.expectEqualStrings("'font-bold': font family 'A, B' is empty or holds ',' or ':', which foot reads as separators", fixture.diagnostics.message());
-    const none: App = .{ .main = .{ .font = &.{} } };
-    try testing.expectError(error.AppFailed, none.apply(&fixture.output));
-    try testing.expectEqualStrings("'font' lists no fonts; leave it null to keep foot's own", fixture.diagnostics.message());
-    const clash: App = .{ .colors_light = .{ .alpha = 1 }, .extra = &.{.{ .path = "colors-light.alpha", .value = .{ .float = 0.5 } }} };
-    try testing.expectError(error.AppFailed, clash.apply(&fixture.output));
-    try testing.expectEqualStrings("extra 'colors-light.alpha' and setting 'colors-light.alpha' write the same key, or one inside the other; keep one", fixture.diagnostics.message());
+    try fixture.expectFailure(.{ .main = .{ .font_bold = &.{.{ .family = "A, B" }} } }, "'main.font-bold': font family 'A, B' is empty or holds ',' or ':', which foot reads as separators");
+    try fixture.expectFailure(.{ .csd = .{ .font = &.{} } }, "'csd.font': lists no fonts; leave it null to keep foot's own");
+    try fixture.expectFailure(
+        .{ .colors_light = .{ .alpha = 1 }, .extra = &.{.{ .path = "colors-light.alpha", .value = .{ .float = 0.5 } }} },
+        "extra 'colors-light.alpha' and setting 'colors-light.alpha' write the same key, or one inside the other; keep one",
+    );
+}
+
+test "options foot would misread fail the apply naming them" {
+    var fixture: Fixture = undefined;
+    try fixture.init();
+    defer fixture.deinit();
+    try fixture.expectFailure(
+        .{ .main = .{ .initial_window_size_pixels = .{ .width = 1, .height = 1 }, .initial_window_size_chars = .{ .width = 1, .height = 1 } } },
+        "'main.initial-window-size-pixels' and 'main.initial-window-size-chars' are both set; foot takes one",
+    );
+    try fixture.expectFailure(.{ .key_bindings = .{ .quit = &.{"Control+ q"} } }, "'key-bindings.quit': key combination 'Control+ q' is empty or holds a space, which foot reads as a separator");
+    try fixture.expectFailure(.{ .key_bindings = .{ .pipe_selected = &.{.{ .command = "" }} } }, "'key-bindings.pipe-selected': a pipe's command is empty");
+    try fixture.expectFailure(.{ .colors_dark = .{ .palette = &.{.{ .index = 3, .color = kosm.hex("000000") }} } }, "'colors-dark.palette': index 3 is one of the 16 ANSI colors; set it through regularN or brightN");
+    try fixture.expectFailure(
+        .{ .colors_dark = .{ .palette = &.{ .{ .index = 20, .color = kosm.hex("000000") }, .{ .index = 20, .color = kosm.hex("ffffff") } } } },
+        "'colors-dark.palette': index 20 is set twice",
+    );
+    try fixture.expectFailure(.{ .regex = &.{ .{ .name = "a", .regex = "x" }, .{ .name = "a", .regex = "y" } } }, "'regex': 'a' is named twice; foot reads one section per name");
+    try fixture.expectFailure(.{ .text_bindings = &.{.{ .text = "a", .keys = &.{} }} }, "'text-bindings.a': lists no keys; a text binding needs at least one");
+}
+
+test "a value foot would cut at a comment fails" {
+    var fixture: Fixture = undefined;
+    try fixture.init();
+    defer fixture.deinit();
+    const app: App = .{ .bell = .{ .command = "notify-send bell # loud" } };
+    try testing.expectError(error.UnsupportedValue, app.apply(&fixture.output));
+    try testing.expect(std.mem.indexOf(u8, fixture.diagnostics.message(), "comment") != null);
 }

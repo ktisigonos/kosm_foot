@@ -18,6 +18,10 @@
         "build.zig.zon",
         "root.zig",
         "App.zig",
+        "settings.zig",
+        "values.zig",
+        "values",
+        "sections",
         "README.md",
     },
 }
