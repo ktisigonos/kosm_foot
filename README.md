@@ -12,8 +12,8 @@ include=~/.config/foot/kosm.ini
 ```
 
 `from(theme)` fills `colors_dark`, the theme foot starts with: foreground and background from
-white and black (swapped in light mode), `alpha` from the theme's `background_alpha`, `regular0`
-to `regular7` from the wheel and `bright0` to `bright7` one `lightness.bright` step brighter.
+the theme's roles, `alpha` from the theme's `background_alpha`, `regular0`
+to `regular7` from the wheel and `bright0` to `bright7` one `lightness.bright` step brighter, `urls` from the link role.
 Everything else is left to foot. foot reads its config only at start, so there is no reload.
 
 ## Fields

@@ -76,14 +76,14 @@ mouse_bindings: MouseBindings = .{},
 extra: []const kosm.Setting = &.{},
 
 /// Colors from the theme into `colors_dark`, foot's starting theme, whatever the mode:
-/// foreground and background from white and black (swapped in light mode), the background's
+/// foreground and background from their roles, the background's
 /// translucency from the theme's `background_alpha`, regular colors from the wheel and bright
-/// ones from the theme's `lightness.bright`. Everything else is left to foot.
+/// ones from the theme's `lightness.bright`, URLs from the link role. Everything else is left to foot.
 pub fn from(theme: kosm.Theme) App {
     const palette = theme.palette;
     const variations = theme.variations;
-    const foreground = if (theme.mode == .dark) palette.white else palette.black;
-    const background = if (theme.mode == .dark) palette.black else palette.white;
+    const foreground = theme.roles.foreground;
+    const background = theme.roles.background;
     const regular = [_]kosm.Color{ palette.black, palette.red, palette.green, palette.yellow, palette.blue, palette.magenta, palette.cyan, palette.white };
     var colors: Colors = .{
         .alpha = theme.background_alpha,
@@ -92,7 +92,7 @@ pub fn from(theme: kosm.Theme) App {
         .cursor = .{ .text = background, .background = foreground },
         .selection_foreground = variations.emphasis.strong.apply(foreground),
         .selection_background = variations.state.selected.apply(background),
-        .urls = palette.cyan,
+        .urls = theme.roles.link,
     };
     inline for (regular, 0..) |color, index| {
         @field(colors, std.fmt.comptimePrint("regular{d}", .{index})) = color;
@@ -189,7 +189,7 @@ test "fonts in fallback order and the theme's colors in foot's spelling, extras 
     var fixture: Fixture = undefined;
     try fixture.init();
     defer fixture.deinit();
-    var theme = kosm.Theme.from(.{ .black = kosm.hex("041c26"), .white = kosm.hex("a3c5cc"), .blue = kosm.hex("267180") }, .dark);
+    var theme = kosm.Theme.from(.{ .palette = .{ .black = kosm.hex("041c26"), .white = kosm.hex("a3c5cc"), .blue = kosm.hex("267180") }, .mode = .dark });
     theme.background_alpha = 0.8;
     var app = from(theme);
     app.main.font = &.{ .{ .family = "Maple Mono Normal NFP", .size = 13 }, .{ .family = "Noto Color Emoji" } };
